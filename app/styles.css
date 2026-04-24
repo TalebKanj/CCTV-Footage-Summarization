@@ -1,0 +1,9 @@
+/* CCTV Footage Summarization - Component Styles (Simplified) */
+/* Most styles are now in app/theme.py */
+
+:root {
+    --syrian-red: #CE1126;
+    --syrian-gold: #B9A779;
+}
+
+/* Additional custom styles can be added here */

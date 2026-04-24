@@ -32,3 +32,45 @@ def summarize_frames_to_video(frames_dir, output_video_path, summary_fps=12, ima
         summary_fps
     )
     write_frames_to_video(video_writer, frame_paths)
+
+
+def summarize_segments_to_video(video_path, segments, output_video_path, output_fps=None):
+    if not segments:
+        raise ValueError("No segments provided for summarization.")
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise ValueError(f"Could not open video file: {video_path}")
+
+    source_fps = cap.get(cv2.CAP_PROP_FPS)
+    if source_fps <= 0:
+        source_fps = 12.0
+
+    write_fps = output_fps if output_fps is not None else source_fps
+
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    video_writer = initialize_video_writer(
+        output_video_path,
+        (width, height),
+        write_fps
+    )
+
+    for segment in segments:
+        start_frame = segment["start_frame"]
+        end_frame = segment["end_frame"]
+
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+        current_frame = start_frame
+
+        while current_frame <= end_frame:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            video_writer.write(frame)
+            current_frame += 1
+
+    video_writer.release()
+    cap.release()

@@ -2,8 +2,13 @@
 Videos/
 results/
 
+# Legacy output (migrated to results/)
+data/outputs/
+dist/
+
 # YOLO models
 *.pt
+
 
 # Python cache
 __pycache__/
