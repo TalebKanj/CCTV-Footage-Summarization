@@ -8,7 +8,6 @@ class AppConfig:
     """Central configuration for CCTV Footage Summarization."""
 
     video_path: str = "data/inputs/test.mp4"
-    yolo_model_path: str = "models/yolov8n.pt"
 
     pixel_diff_thresh: int = 15
     percent_changed_thresh: float = 0.15
@@ -20,11 +19,6 @@ class AppConfig:
     merge_gap_sec: float = 2.0
     pre_event_sec: float = 2.0
     post_event_sec: float = 4.0
-
-    mog2_history: int = 500
-    mog2_var_threshold: int = 15
-    mog2_detect_shadows: bool = False
-    buffer_duration_sec: float = 1.5
 
     output_base: str = "results"
     cache_db_path: str = "data/summary_cache.json"
@@ -46,7 +40,6 @@ def load_config() -> AppConfig:
     """Load configuration from environment variables with safe defaults."""
     return AppConfig(
         video_path=os.getenv("VIDEO_PATH", "data/inputs/test.mp4"),
-        yolo_model_path=os.getenv("YOLO_MODEL_PATH", "models/yolov8n.pt"),
         pixel_diff_thresh=int(os.getenv("PIXEL_DIFF_THRESH", "15")),
         percent_changed_thresh=float(os.getenv("PERCENT_CHANGED_THRESH", "0.15")),
         summary_fps=int(os.getenv("SUMMARY_FPS", "12")),

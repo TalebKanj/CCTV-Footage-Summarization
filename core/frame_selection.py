@@ -98,7 +98,7 @@ def select_keyframes(
 def run_frame_selection(
     video_path,
     pixel_diff_thresh=15,
-    percent_changed_thresh=1.5,
+    percent_changed_thresh=0.15,
     progress_callback=None
 ):
 
