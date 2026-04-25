@@ -1,6 +1,10 @@
 # Large data
 Videos/
 results/
+build/
+dist/
+.venv/
+.github/
 
 # Legacy output (migrated to results/)
 data/outputs/

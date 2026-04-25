@@ -1,0 +1,28 @@
+# CCTV Footage Summarization - Python 3.13 Dependencies
+# Target: PyTorch 2.9.0, CUDA 13
+
+--extra-index-url https://download.pytorch.org/whl/cu130
+
+# Core ML/Vision
+torch==2.9.0
+torchvision==0.24
+ultralytics>=8.4.0
+opencv-python==4.8.0.76
+numpy==1.24.4
+
+# GUI Framework
+PySide6==6.6.1
+
+# Utilities
+Pillow==10.0.0
+matplotlib==3.8.0
+scipy==1.11.0
+
+# Optional: Tracking support
+filterpy==1.4.2
+
+# Development & Testing (optional)
+pytest==7.4.0
+black==23.9.0
+isort==5.12.0
+pylint==3.0.0

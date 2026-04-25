@@ -1,0 +1,9 @@
+{
+  "pixel_diff_thresh": 15,
+  "percent_changed_thresh": 0.15,
+  "summary_fps": 12,
+  "merge_gap_sec": 2.0,
+  "pre_event_sec": 2.0,
+  "post_event_sec": 4.0,
+  "yolo_confidence": 0.3
+}
