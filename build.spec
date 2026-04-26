@@ -1,26 +1,39 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
+
+from PyInstaller.building.datastruct import Tree
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
-from PyInstaller import *
 
 block_cipher = None
 
-# Collect PySide6 submodules
-pyqt6_submodules = collect_submodules('PySide6')
-pyqt6_datas = collect_data_files('PySide6', include_py_files=True)
-pyqt6_binaries = collect_dynamic_libs('PySide6')
+# Collect PySide6 submodules and Qt plugins (needed for QMediaPlayer/QVideoSink, etc.)
+pyside6_submodules = collect_submodules("PySide6")
+pyside6_datas = collect_data_files("PySide6", include_py_files=True)
+pyside6_binaries = collect_dynamic_libs("PySide6")
+
+qt_plugin_binaries = []
+try:
+    import PySide6  # type: ignore
+
+    pyside6_dir = os.path.dirname(PySide6.__file__)
+    qt_plugins_dir = os.path.join(pyside6_dir, "Qt", "plugins")
+    if os.path.isdir(qt_plugins_dir):
+        # Bundle all Qt plugins as binaries to avoid runtime "no platform plugin" / multimedia backend issues.
+        qt_plugin_binaries = Tree(qt_plugins_dir, prefix="PySide6/Qt/plugins", typecode="BINARY")
+except Exception:
+    qt_plugin_binaries = []
 
 a = Analysis(
-    ['app/ui_pyside6/wrapper_entry.py'],
+    ['main.py'],
     pathex=[os.path.abspath('.')],
-    binaries=pyqt6_binaries,
+    binaries=pyside6_binaries + qt_plugin_binaries,
     datas=[
         # Assets folder
         ('assets', 'assets'),
-        # Config files
-        ('app/config.py', 'app'),
+        # Runtime resources / configs
         ('custom_bytetrack.yaml', '.'),
-    ] + pyqt6_datas,
+        ('prompts.txt', '.'),
+    ] + pyside6_datas,
     hiddenimports=[
         # PySide6
         'PySide6',
@@ -28,6 +41,9 @@ a = Analysis(
         'PySide6.QtGui',
         'PySide6.QtWidgets',
         'PySide6.QtWinExtras',
+        'PySide6.QtMultimedia',
+        'PySide6.QtMultimediaWidgets',
+        'PySide6.QtNetwork',
         # Core dependencies
         'cv2',
         'cv2.cv2',
@@ -35,9 +51,10 @@ a = Analysis(
         'numpy.core._multiarray_umath',
         'ultralytics',
         'ultralytics.yolo',
+        'huggingface_hub',
         'PIL',
         'PIL.Image',
-    ] + pyqt6_submodules,
+    ] + pyside6_submodules,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

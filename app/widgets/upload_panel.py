@@ -1,237 +1,150 @@
-# -*- coding: utf-8 -*-
-"""Upload panel widget for PySide6 UI - Unified Border Styling Edition."""
+from __future__ import annotations
 
 import os
-from PySide6.QtWidgets import (
-    QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QWidget, QFileDialog, QGraphicsDropShadowEffect
-)
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QImage, QPixmap, QColor
+from typing import Optional
 
-from ..utils import compute_file_hash, format_file_size, VIDEO_FILTER
-from ..fonts import get_app_font
-from ..theme import get_theme_manager
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+
+import api
+from ..theme import apply_card_shadow
+
+
+VIDEO_FILTER = "Video Files (*.mp4 *.avi *.mov *.mkv);;All Files (*)"
 
 
 class UploadPanel(QFrame):
-    """لوحة إدارة الملفات بتصميم موحد حيث تتطابق الحدود الداخلية مع الحدود الخارجية تماماً."""
-
-    file_selected = Signal(str)
+    video_selected = Signal(str)
     process_requested = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName("main_panel")
-        self.setFixedWidth(440)
-        self._current_file = None
-        self._is_processing = False
+        self.setObjectName("card")
+        self.setLayoutDirection(Qt.RightToLeft)
+        apply_card_shadow(self)
+        self._video_path: Optional[str] = None
         self._setup_ui()
-        self._apply_styles()
-        self._connect_theme()
-    
-    def _connect_theme(self):
-        theme_manager = get_theme_manager()
-        theme_manager.theme_changed.connect(self._on_theme_changed)
-    
-    def _on_theme_changed(self, theme: str):
-        self._apply_styles()
+        self._set_empty()
 
-    def _apply_styles(self):
-        # توحيد نمط البوردر الذهبي الخافت للهوية الوطنية الجديدة
-        unified_border = "1px solid rgba(185, 167, 121, 0.4)"
-        
-        self.setStyleSheet(f"""
-            QFrame#main_panel {{
-                background-color: #002623;
-                border: {unified_border}; 
-                border-radius: 40px;
-            }}
+    def _setup_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
 
-            /* العنوان العلوي - نفس البوردر الخارجي */
-            QLabel#panel_title {{
-                color: #b9a779;
-                border: {unified_border};
-                border-radius: 12px;
-                padding: 8px 25px;
-                background-color: rgba(22, 22, 22, 0.5);
-            }}
+        header = QWidget(self)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(8)
 
-            /* منطقة الرفع/العرض - نفس البوردر الخارجي */
-            QFrame#drop_zone {{
-                background-color: #161616;
-                border: {unified_border};
-                border-radius: 25px;
-            }}
-            
-            QLabel#video_preview {{
-                color: rgba(185, 167, 121, 0.4);
-                background: transparent;
-            }}
-
-            /* بطاقة المعلومات - نفس البوردر الخارجي */
-            QWidget#info_card {{
-                background-color: rgba(22, 22, 22, 0.6);
-                border: {unified_border};
-                border-radius: 20px;
-                padding: 15px;
-            }}
-            
-            QLabel#info_label {{ color: #b9a779; font-size: 10px; font-weight: bold; }}
-            QLabel#info_value {{ color: #edebe0; font-size: 11px; }}
-
-            /* زر الإجراء الرئيسي - نفس البوردر الخارجي */
-            QPushButton#process_btn {{
-                background-color: #161616; 
-                color: #b9a779;
-                border: {unified_border};
-                border-radius: 20px;
-                padding: 15px;
-                font-size: 16px;
-                font-weight: bold;
-            }}
-            QPushButton#process_btn:hover {{ 
-                background-color: #b9a779; 
-                color: #161616; 
-                border: 1px solid #edebe0;
-            }}
-            QPushButton#process_btn:disabled {{ 
-                border-color: rgba(61, 58, 59, 0.4); 
-                color: #3d3a3b; 
-            }}
-        """)
-
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(60)
-        shadow.setColor(QColor(185, 167, 121, 25))
-        self.setGraphicsEffect(shadow)
-
-    def _setup_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(40, 45, 40, 45)
-        main_layout.setSpacing(35)
-
-        # 1. العنوان
-        title_container = QHBoxLayout()
-        self.title_lbl = QLabel("إدارة ملفات النظام")
-        self.title_lbl.setObjectName("panel_title")
-        self.title_lbl.setFont(get_app_font("Bold", 12))
-        title_container.addStretch()
-        title_container.addWidget(self.title_lbl)
-        title_container.addStretch()
-        main_layout.addLayout(title_container)
-
-        # 2. منطقة الرفع/العرض
-        self.drop_zone = QFrame()
-        self.drop_zone.setObjectName("drop_zone")
-        self.drop_zone.setFixedHeight(220)
-        self.drop_zone.setCursor(Qt.PointingHandCursor)
-        self.drop_zone.mousePressEvent = lambda e: self._select_file()
-
-        dz_layout = QVBoxLayout(self.drop_zone)
-        self.video_preview = QLabel("انقر لتحميل بيانات الفيديو")
-        self.video_preview.setObjectName("video_preview")
-        self.video_preview.setAlignment(Qt.AlignCenter)
-        self.video_preview.setFont(get_app_font("Medium", 11))
-        
-        dz_layout.addWidget(self.video_preview)
-        main_layout.addWidget(self.drop_zone)
-
-        # 3. بطاقة المعلومات
-        self.info_box = QWidget()
-        self.info_box.setObjectName("info_card")
-        self.info_box.setVisible(False)
-        info_layout = QVBoxLayout(self.info_box)
-        info_layout.setSpacing(12)
-        
-        self.widgets = {}
-        for ar_text, key in [("اسم الملف", "FILE"), ("حجم الملف", "SIZE"), ("بصمة التحقق", "HASH")]:
-            row = QHBoxLayout()
-            val = QLabel("-")
-            val.setObjectName("info_value")
-            lbl = QLabel(ar_text)
-            lbl.setObjectName("info_label")
-            row.addWidget(val, 0, Qt.AlignLeft)
-            row.addStretch()
-            row.addWidget(lbl, 0, Qt.AlignRight)
-            info_layout.addLayout(row)
-            self.widgets[key] = val
-        main_layout.addWidget(self.info_box)
-
-        # 4. الزر
-        self.process_btn = QPushButton("بدء التحليل الذكي")
-        self.process_btn.setObjectName("process_btn")
-        self.process_btn.setEnabled(False)
-        self.process_btn.clicked.connect(lambda: self.process_requested.emit(self._current_file))
-        main_layout.addWidget(self.process_btn)
-
-        main_layout.addStretch()
-
-    def _select_file(self):
-        path, _ = QFileDialog.getOpenFileName(self, "اختر الفيديو", "", VIDEO_FILTER)
-        if path and os.path.exists(path):
-            self._set_file(path)
-
-    def _set_file(self, path: str):
-        self._current_file = path
-        name = os.path.basename(path)
-        self.widgets["FILE"].setText(name[:25] + "..." if len(name) > 25 else name)
-        self.widgets["SIZE"].setText(format_file_size(os.path.getsize(path)))
-        self.widgets["HASH"].setText(compute_file_hash(path)[:12])
-        self.info_box.setVisible(True)
-        self.process_btn.setEnabled(True)
-        self._load_preview(path)
-        self.file_selected.emit(path)
-
-    def _load_preview(self, path):
-        try:
-            import cv2
-            cap = cv2.VideoCapture(path)
-            ret, frame = cap.read()
-            cap.release()
-            if ret:
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                img = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
-                pix = QPixmap.fromImage(img).scaled(380, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                self.video_preview.setPixmap(pix)
-        except Exception:
-            self.video_preview.setText("المعاينة غير متاحة")
-
-    def set_processing(self, processing: bool):
-        """Set the processing state of the panel."""
-        self._is_processing = processing
-        
-        if processing:
-            self.process_btn.setEnabled(False)
-            self.drop_zone.setEnabled(False)
-            self.drop_zone.setCursor(Qt.ForbiddenCursor)
-            self.widgets["FILE"].setText("جاري المعالجة...")
-            self.widgets["SIZE"].setText("-")
-            self.widgets["HASH"].setText("-")
+        repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        logo_path = os.path.join(repo_root, "assets", "logo_128.svg")
+        if os.path.exists(logo_path):
+            from PySide6.QtSvgWidgets import QSvgWidget
+            icon = QSvgWidget(logo_path, header)
+            icon.setFixedSize(24, 24)
         else:
-            self.drop_zone.setEnabled(True)
-            self.drop_zone.setCursor(Qt.PointingHandCursor)
-            
-            if self._current_file and os.path.exists(self._current_file):
-                self.widgets["FILE"].setText(os.path.basename(self._current_file))
-                self.widgets["SIZE"].setText(format_file_size(os.path.getsize(self._current_file)))
-                self.widgets["HASH"].setText(compute_file_hash(self._current_file)[:12])
-                self.process_btn.setEnabled(True)
-            else:
-                self.widgets["FILE"].setText("-")
-                self.widgets["SIZE"].setText("-")
-                self.widgets["HASH"].setText("-")
-                self.process_btn.setEnabled(False)
+            icon = QLabel("📥", header)
+            icon.setStyleSheet("font-size: 18px;")
+        title = QLabel("رفع الفيديو", header)
+        title.setStyleSheet("font-size: 14px; font-weight: bold;")
 
-    def is_processing(self) -> bool:
-        """Return whether the panel is currently in processing state."""
-        return self._is_processing
+        header_layout.addWidget(icon)
+        header_layout.addWidget(title)
+        header_layout.addStretch()
 
-    def clear(self):
-        """Clear the upload panel to reset to starting point."""
-        self._current_file = None
-        self._is_processing = False
-        self.info_box.setVisible(False)
+        self.select_btn = QPushButton("اختيار فيديو", self)
+        self.select_btn.setObjectName("primary_btn")
+        self.select_btn.clicked.connect(self._pick_video)
+
+        layout.addWidget(header)
+        layout.addWidget(self.select_btn)
+
+        info_box = QWidget(self)
+        form = QFormLayout(info_box)
+        form.setLabelAlignment(Qt.AlignRight)
+        form.setFormAlignment(Qt.AlignTop)
+
+        self.name_val = QLabel("-", info_box)
+        self.size_val = QLabel("-", info_box)
+        self.duration_val = QLabel("-", info_box)
+        self.fps_val = QLabel("-", info_box)
+        self.frames_val = QLabel("-", info_box)
+        self.hash_val = QLabel("-", info_box)
+        self.hash_val.setTextInteractionFlags(Qt.TextSelectableByMouse)
+
+        form.addRow("اسم الملف:", self.name_val)
+        form.addRow("الحجم:", self.size_val)
+        form.addRow("المدة:", self.duration_val)
+        form.addRow("FPS:", self.fps_val)
+        form.addRow("عدد الإطارات:", self.frames_val)
+        form.addRow("SHA-256:", self.hash_val)
+
+        layout.addWidget(info_box)
+        layout.addStretch()
+
+        self.process_btn = QPushButton("بدء التلخيص", self)
+        self.process_btn.setObjectName("primary_btn")
+        self.process_btn.clicked.connect(self._emit_process)
+        layout.addWidget(self.process_btn)
+
+    def _pick_video(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "اختر الفيديو", "", VIDEO_FILTER)
+        if not path:
+            return
+        self.set_video(path)
+
+    def set_video(self, path: str) -> None:
+        if not os.path.exists(path):
+            self._set_empty()
+            return
+
+        self._video_path = path
+        info = api.get_video_info(path)
+
+        self.name_val.setText(info["name"])
+        self.size_val.setText(api.format_file_size(info["size_bytes"]))
+        dur = info.get("duration_sec")
+        self.duration_val.setText(f"{dur:.2f} ثانية" if isinstance(dur, (int, float)) else "-")
+        self.fps_val.setText(f"{info.get('fps', 0.0):.2f}")
+        self.frames_val.setText(str(info.get("frame_count", "-")))
+        try:
+            self.hash_val.setText(api.compute_sha256(path)[:16])
+        except Exception:
+            self.hash_val.setText("-")
+
+        self.process_btn.setEnabled(True)
+        self.video_selected.emit(path)
+
+    def current_video(self) -> Optional[str]:
+        return self._video_path
+
+    def set_processing(self, processing: bool) -> None:
+        self.select_btn.setEnabled(not processing)
+        self.process_btn.setEnabled((not processing) and bool(self._video_path))
+
+    def clear(self) -> None:
+        self._set_empty()
+        self.video_selected.emit("")
+
+    def _set_empty(self) -> None:
+        self._video_path = None
+        self.name_val.setText("-")
+        self.size_val.setText("-")
+        self.duration_val.setText("-")
+        self.fps_val.setText("-")
+        self.frames_val.setText("-")
+        self.hash_val.setText("-")
         self.process_btn.setEnabled(False)
-        self.video_preview.setText("انقر لتحميل بيانات الفيديو")
-        self.file_selected.emit("")
+
+    def _emit_process(self) -> None:
+        if self._video_path:
+            self.process_requested.emit(self._video_path)

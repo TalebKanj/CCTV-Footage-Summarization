@@ -1,69 +1,77 @@
-"""Video processor worker for PySide6 background processing."""
+from __future__ import annotations
 
-import sys
-import os
 import traceback
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 
-from PySide6.QtCore import QRunnable, Signal, QObject
+import api
 
 
-class WorkerSignals(QObject):
-    progress = Signal(str, int)
+class VideoProcessorSignals(QObject):
+    progress = Signal(str, int)  # message, percent
     result = Signal(dict)
     error = Signal(str)
+    finished = Signal()
+
+
+def _format_exception_message(exc: BaseException) -> str:
+    msg = str(exc).strip()
+    if isinstance(exc, InterruptedError):
+        return "تم إلغاء العملية."
+    if "Weights only load failed" in msg or "weights_only" in msg:
+        return (
+            "تعذر تحميل أوزان YOLO بسبب قيود PyTorch (weights_only). "
+            "تم تطبيق إصلاح تلقائي، أعد المحاولة. "
+            "إذا استمرت المشكلة: حدّث Ultralytics أو استخدم ملف أوزان رسمي موثوق."
+        )
+    if not msg:
+        return exc.__class__.__name__
+    return msg
 
 
 class VideoProcessorWorker(QRunnable):
-    """QRunnable worker for video summarization processing."""
-    
-    def __init__(self, video_path: str):
+    """Background worker for video summarization.
+
+    Runs in a `QThreadPool` and communicates back via Qt signals.
+    """
+
+    def __init__(self, video_path: str, config: dict):
         super().__init__()
         self.video_path = video_path
-        self.signals = WorkerSignals()
-        self._is_cancelled = False
-    
-    def cancel(self):
-        self._is_cancelled = True
-    
-    def run(self):
+        self.config = config
+        self.signals = VideoProcessorSignals()
+        self._cancelled = False
+
+    def cancel(self) -> None:
+        self._cancelled = True
+
+    @Slot()
+    def run(self) -> None:
         try:
-            if self._is_cancelled:
-                return
-            
             print(f"[DEBUG] Starting processing: {self.video_path}")
-            self.signals.progress.emit("جاري تحميل الفيديو...", 2)
-            
-            from core.summarizer import summarize_video
-            from core.config import load_config
-            
-            if self._is_cancelled:
-                return
-            
-            config = load_config()
-            print(f"[DEBUG] Calling summarize_video for: {self.video_path}")
-            result = summarize_video(
-                self.video_path,
-                config=config,
-                progress_callback=self._on_progress
-            )
-            
-            print(f"[DEBUG] Processing complete, result keys: {result.keys()}")
-            
-            if self._is_cancelled:
-                return
-            
+            print(f"[DEBUG] Config keys: {sorted(list(self.config.keys()))}")
+
+            last_percent = {"value": -1}
+
+            def progress_callback(message: str, percent: int) -> None:
+                if self._cancelled:
+                    raise InterruptedError("Processing cancelled")
+                self.signals.progress.emit(message, int(percent))
+                try:
+                    p = int(percent)
+                    if p == 0 or p == 100 or p - last_percent["value"] >= 10:
+                        last_percent["value"] = p
+                        print(f"[DEBUG] Progress emit: {p}% - {message}")
+                except Exception:
+                    pass
+
+            result = api.summarize_video(self.video_path, self.config, progress_callback)
+            print(f"[DEBUG] Processing result keys: {sorted(list((result or {}).keys()))}")
             self.signals.result.emit(result)
-            
-        except Exception as e:
-            error_msg = f"{type(e).__name__}: {str(e)}"
-            print(f"[ERROR] {error_msg}")
-            print(f"[DEBUG] Traceback:\n{traceback.format_exc()}")
-            self.signals.error.emit(error_msg)
-    
-    def _on_progress(self, message: str, progress: int):
-        if not self._is_cancelled:
-            progress_int = int(progress)
-            print(f"[DEBUG] Progress emit: {progress_int}%")
-            self.signals.progress.emit(message, progress_int)
+        except Exception as exc:
+            # Keep full traceback in console for diagnostics, but show only the exception message in the UI.
+            tb = traceback.format_exc()
+            print(f"[ERROR] Worker exception:\n{tb}")
+            self.signals.error.emit(_format_exception_message(exc))
+        finally:
+            self.signals.finished.emit()

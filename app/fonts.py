@@ -1,6 +1,12 @@
-"""Custom font loader for PySide6 UI."""
+"""Custom Arabic font loader for the PySide6 UI.
+
+Keeps the `app/` UI Arabic-first while gracefully falling back to system fonts.
+"""
+
+from __future__ import annotations
 
 import os
+
 from PySide6.QtGui import QFont, QFontDatabase
 
 
@@ -8,68 +14,52 @@ ARABIC_FONT_FAMILY = "Itf Qomra Arabic"
 FALLBACK_FONTS = ["Traditional Arabic", "Arial", "Tahoma", "Segoe UI", "DejaVu Sans"]
 
 
-def load_app_fonts():
-    """Load custom Arabic fonts from assets directory."""
-    app_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    assets_dir = os.path.join(app_dir, "assets")
-    loaded_fonts = []
+def load_app_fonts() -> list[str]:
+    """Load bundled fonts from the repo `assets/` directory."""
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    assets_dir = os.path.join(repo_root, "assets")
+    loaded_families: list[str] = []
 
     if not os.path.exists(assets_dir):
-        return loaded_fonts
+        return loaded_families
 
-    font_weights = ["Regular", "Bold", "Medium", "Light"]
-
-    for weight in font_weights:
+    for weight in ["Regular", "Bold", "Medium", "Light"]:
         font_path = os.path.join(assets_dir, f"itfQomraArabic-{weight}.otf")
-        if os.path.exists(font_path):
-            font_id = QFontDatabase.addApplicationFont(font_path)
-            if font_id != -1:
-                families = QFontDatabase.applicationFontFamilies(font_id)
-                if ARABIC_FONT_FAMILY not in loaded_fonts:
-                    loaded_fonts.append(ARABIC_FONT_FAMILY)
-                loaded_fonts.extend(families)
+        if not os.path.exists(font_path):
+            continue
 
-    return loaded_fonts
+        font_id = QFontDatabase.addApplicationFont(font_path)
+        if font_id == -1:
+            continue
+
+        families = QFontDatabase.applicationFontFamilies(font_id)
+        loaded_families.extend(families)
+
+    return loaded_families
 
 
 def _get_font_family() -> str:
-    """Get the best available font family, with fallback."""
-    available_families = QFontDatabase.families()
-    
-    if ARABIC_FONT_FAMILY in available_families:
+    available = set(QFontDatabase.families())
+    if ARABIC_FONT_FAMILY in available:
         return ARABIC_FONT_FAMILY
-    
     for font in FALLBACK_FONTS:
-        if font in available_families:
+        if font in available:
             return font
-    
     return ""
 
 
-def get_app_font(weight: str = "Regular", size: int = 12) -> QFont:
-    """Get a QFont instance with the custom Arabic font."""
-    font_family = _get_font_family()
-    
-    if font_family:
-        font = QFont(font_family, size)
-    else:
-        font = QFont(size)
-        font.setStyleHint(QFont.StyleHint.System)
-    
+def get_app_font(weight: str = "Regular", size: int = 11) -> QFont:
+    family = _get_font_family()
+    font = QFont(family, size) if family else QFont(size)
+
     weight_map = {
         "Light": QFont.Weight.Light,
         "Regular": QFont.Weight.Normal,
         "Medium": QFont.Weight.Medium,
         "Bold": QFont.Weight.Bold,
     }
-
     if weight in weight_map:
         font.setWeight(weight_map[weight])
 
     return font
 
-
-def apply_font_to_widget(widget, weight: str = "Regular", size: int = 12):
-    """Apply the custom Arabic font to a widget."""
-    font = get_app_font(weight, size)
-    widget.setFont(font)

@@ -35,8 +35,8 @@ def build_segments(
 
     raw_segments.append((segment_start, segment_end))
 
-    final_segments = []
-
+    merged_final_segments = []
+    
     for start_idx, end_idx in raw_segments:
 
         expanded_start = max(0, start_idx - pre_event_frames)
@@ -45,7 +45,7 @@ def build_segments(
         if total_frames is not None:
             expanded_end = min(total_frames - 1, expanded_end)
 
-        final_segments.append({
+        new_segment = {
             "start_frame": expanded_start,
             "end_frame": expanded_end,
             "start_time": round(expanded_start / fps, 3),
@@ -53,6 +53,21 @@ def build_segments(
             "duration_sec": round((expanded_end - expanded_start + 1) / fps, 3),
             "trigger_start_frame": start_idx,
             "trigger_end_frame": end_idx
-        })
+        }
+        
+        if not merged_final_segments:
+            merged_final_segments.append(new_segment)
+        else:
+            last_segment = merged_final_segments[-1]
+            if new_segment["start_frame"] <= last_segment["end_frame"]:
+                # Overlap! Merge them.
+                last_segment["end_frame"] = max(last_segment["end_frame"], new_segment["end_frame"])
+                last_segment["end_time"] = round(last_segment["end_frame"] / fps, 3)
+                last_segment["duration_sec"] = round((last_segment["end_frame"] - last_segment["start_frame"] + 1) / fps, 3)
+                last_segment["trigger_end_frame"] = max(last_segment["trigger_end_frame"], new_segment["trigger_end_frame"])
+            else:
+                merged_final_segments.append(new_segment)
+    # Filter out segments less than 1.0 seconds
+    final_segments = [seg for seg in merged_final_segments if seg["duration_sec"] >= 1.0]
 
     return final_segments

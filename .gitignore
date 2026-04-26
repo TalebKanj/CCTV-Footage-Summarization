@@ -1,22 +1,50 @@
-# Large data
-Videos/
+# ==========================================
+# Application Specific
+# ==========================================
+# Outputs and inputs
 results/
-build/
-dist/
-.venv/
-.github/
-
-# Legacy output (migrated to results/)
 data/outputs/
-dist/
+Videos/
+data/inputs/
 
-# YOLO models
+# YOLO Models
+models/*.pt
 *.pt
 
+# Runtime Data, Logs & Cache
+data/summary_cache.json
+data/history.json
+data/settings.json
+data/runtime_logs.json
 
-# Python cache
+# ==========================================
+# Python Standard
+# ==========================================
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# Build and Distribution
+build/
+dist/
+*.egg-info/
+*.spec
+
+# ==========================================
+# IDEs & OS Files
+# ==========================================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ==========================================
 # Notebooks
+# ==========================================
 .ipynb_checkpoints/

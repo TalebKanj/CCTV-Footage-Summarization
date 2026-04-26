@@ -84,17 +84,13 @@ project/
 
 1. **Install dependencies**
 ```bash
-  pip install opencv-python ultralytics numpy matplotlib PySide6 torch
+  pip install opencv-python ultralytics numpy matplotlib
 ```
 2. **Place Input Video**
 ```bash
-  data/inputs/{video-name}.mp4
+  Videos/{video-name}.mp4
 ```
-3. **Run the PySide6 desktop application**
-```bash
-  python -m app.main
-```
-4. **Optional legacy CLI fallback**
+3. **Run main.py**
 ```bash
   python main.py
 ```
